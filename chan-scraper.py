@@ -40,7 +40,7 @@ class Game:
         #pprint.pprint(systems)
         self.system = systems[int(self.systemid)]
         print("System Id: " + str(self.systemid)+ ' : ' + self.system)
-        
+       
         self.name = node['jeu']['nom']
         romregion = node ['jeu']['regionshortnames']
 
@@ -53,8 +53,7 @@ class Game:
         #print(sinopsys)
         medias = node['jeu']['medias']
     
-        self.base_download_dir = 'media'
-        self.download_filename = os.path.join(self.base_download_dir, self.name) 
+        self.base_download_dir = os.path.join('media', self.system)
 
         self.screenshot = self.create_media(medias, 'media_screenshot', os.path.join(self.base_download_dir,'screenshot', self.name))
         self.video = self.create_media(medias, 'media_video', os.path.join(self.base_download_dir,'screenshot', self.name))
@@ -130,9 +129,9 @@ def get_key_from_prefix (dictionary, prefix_key, sufixes_keys):
 class ScreenScraperFrApi:
     def __init__(self, ssid, sspassword, langs):
         self.url_base = 'https://www.screenscraper.fr/api/'
-        self.devid = 'xxx'
-        self.devpassword = 'yyy'
-        self.softname = 'zzz'
+        self.devid = 'chanilino'
+        self.devpassword = 'rGU9nm4Pr39GVnC2'
+        self.softname = 'chan-scraper-0.1'
         self.max_threads = 1
         self.user_regions = ['eu']
         self.langs = langs
@@ -149,6 +148,7 @@ class ScreenScraperFrApi:
         payload['sspassword'] = self.sspassword
         payload['output'] = 'json'
         return payload
+
     def __get_json_from_request(self, request):
         if request.status_code != 200:
             raise Exception('Request: ' + request.url  +  '. http status code is not 200: ' + str(request.status_code) )
@@ -186,20 +186,21 @@ class ScreenScraperFrApi:
 
 def worker_hashing(q_files, q_download):
     while True:
+        print('h0: waiting in q_files: ' + str(q_files.empty()))
         filepath = q_files.get()
-        print('h0: ' + str(filepath))
+        print('h1: ' + str(filepath))
         
         hashes = MultipleHashes(filepath)
-        print('h1: ' + str(hashes))
+        print('h3: ' + str(hashes))
     
         #Hack to have the example hashes
-        hashes.crc32sum = '50ABC90A'
-        hashes.md5sum = 'DD6CDEDF6AB92BAD42752C99F91EA420'
-        hashes.sha1sum = '72D0431690165361681C19BEDEFED384818B2C66'
+        #hashes.crc32sum = '50ABC90A'
+        #hashes.md5sum = 'DD6CDEDF6AB92BAD42752C99F91EA420'
+        #hashes.sha1sum = '72D0431690165361681C19BEDEFED384818B2C66'
+        q_files.task_done()
         
         q_download.put(hashes)
         
-        q_files.task_done()
 
 def download_media(media):
     r = requests.get(media.url, stream=True)
@@ -213,8 +214,9 @@ def download_media(media):
 
 def worker_download(q):
     while True:
+        print('d0: waiting in q_download')
         hashes = q.get()
-        print('d: '+ hashes.filepath)
+        print('d1: '+ hashes.filepath)
         game = ss.get_game_info(hashes)
         download_media(game.screenshot)
         download_media(game.video)
@@ -230,18 +232,37 @@ def worker_download(q):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('file', nargs='+', help='the file to calculate the hash')
+    parser.add_argument('roms_dir',nargs='?' ,help='the roms dir to scrape')
+    parser.add_argument('-u', '--user', required=True ,help='The user in screenscraper.fr')
+    parser.add_argument('-p', '--password', required=True ,help='The password in screenscraper.fr')
+    parser.add_argument('-l', '--list-systems', dest='list_systems', action='store_true', 
+            help='Print the systems id and system name and exit')
+    parser.set_defaults(list_systems=False)
     args = parser.parse_args()
     langs = ['en', 'es']
     
-    roms_path = args.file[0]
+   
+    if not args.list_systems and args.roms_dir is None:
+        print("The rom path is mandatory!!")
+        parser.print_help() 
+        exit(1)
+
+    roms_path = args.roms_dir
     max_cpu_threads = 4 
 
+    print(roms_path)
+    print(args.user)
+    print(args.password)
+    pprint.pprint(args.list_systems)
     
-    
-    ss = ScreenScraperFrApi('test', 'test', langs)
-
+    ss = ScreenScraperFrApi(args.user, args.password, langs)
     ss.get_platform_info()
+
+    if args.list_systems:
+        print("TODO: list platform info!")
+        exit(0)
+
+
     max_ss_threads = ss.max_threads
     max_ss_threads = 1
     queue_files = queue.Queue()
@@ -251,12 +272,12 @@ if __name__ == "__main__":
    
    #fist init the pool of threads to have workers
     for i in range(max_cpu_threads):
-        t = threading.Thread(target=worker_hashing, args={queue_files, queue_download} ,daemon=True)
+        t = threading.Thread(target=worker_hashing, args=(queue_files, queue_download,) ,daemon=True)
         threads_download.append(t)
         t.start()
 
     for i in range(max_ss_threads):
-        t = threading.Thread(target=worker_download, args={queue_download} ,daemon=True)
+        t = threading.Thread(target=worker_download, args=(queue_download,) ,daemon=True)
         threads_download.append(t)
         t.start()
 
