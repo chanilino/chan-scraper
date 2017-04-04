@@ -262,7 +262,8 @@ if __name__ == "__main__":
         print("TODO: list platform info!")
         exit(0)
 
-
+    print('TODO: use ConfigParser configparser.ExtendedInterpolation')
+    exit(0)
     max_ss_threads = ss.max_threads
     max_ss_threads = 1
     queue_files = queue.Queue()
