@@ -34,6 +34,31 @@ class Game:
     def __str__(self):  
         return "Name: " + self.name + ' : ' + str(self.romregion)
 
+    def to_str_attractmode_format(self):
+        #Name;Title;Emulator;CloneOf;Year;Manufacturer;Category;Players;Rotation;Control;Status;DisplayCount;DisplayType;AltRomname;AltTitle;Extra;Buttons
+        line =  self.name +  ";" + self.name + ";"
+        # TODO: Check emulator from cfg
+        line += "TODO_EMULATOR;"
+        #Check cloneof == 0
+        if self.cloneof != "0":
+            line += self.cloneof
+        line += ";" 
+
+
+        line += "TODO_CLONEOF;"
+        line += self.date + ";" 
+        line += self.developer + ";" 
+        line += self.category + ";" 
+        line += self.players + ";" 
+        line += self.rotation + ";" 
+        # TODO: Check if other roms have control
+        line += ";" 
+        # TODO: Status
+        line += ";" 
+        #DisplayCount;DisplayType;AltRomname;AltTitle;Extra;Buttons
+        line += ";;;;;"
+
+
     def __init__(self, filepath, node, systems, langs, user_regions):
         self.systemid = node['jeu']['systemeid']
         print("System Id: " + str(self.systemid))
@@ -48,7 +73,16 @@ class Game:
     
         #print('sinopsys_key: ' + str(synopsis_key))
         self.sinopsys = node['jeu']['synopsis'][synopsis_key]
-    
+        
+        dates_key = get_key_from_prefix(node['jeu']['dates'], 'date_', langs)
+        self.date = node['jeu']['dates'][dates_key]
+        
+        genres_key = get_key_from_prefix(node['jeu']['genres'], 'genres__', langs)
+        self.category = node['jeu']['genres'][genres_key]
+        
+        self.developer = node['jeu']['developeur'] 
+        self.players = node['jeu']['joueurs'] 
+        self.rotation = node ['jeu']['rotation']
         #print("sinopsys:")
         #print(sinopsys)
         medias = node['jeu']['medias']
@@ -57,7 +91,6 @@ class Game:
 
         self.screenshot = self.create_media(medias, 'media_screenshot', os.path.join(self.base_download_dir,'screenshot', self.name))
         self.video = self.create_media(medias, 'media_video', os.path.join(self.base_download_dir,'screenshot', self.name))
-        
         
         
         media_wheels_region_key = get_key_from_prefix(medias['media_wheels'],'media_wheel_', romregion + user_regions)
@@ -218,6 +251,8 @@ def worker_download(q):
         hashes = q.get()
         print('d1: '+ hashes.filepath)
         game = ss.get_game_info(hashes)
+
+        print("attractmode: " + game.to_str_attractmode_format())
         download_media(game.screenshot)
         download_media(game.video)
         download_media(game.wheel)
@@ -254,7 +289,6 @@ if __name__ == "__main__":
     print(args.user)
     print(args.password)
     pprint.pprint(args.list_systems)
-    
     ss = ScreenScraperFrApi(args.user, args.password, langs)
     ss.get_platform_info()
 
