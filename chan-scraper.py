@@ -24,6 +24,10 @@ class Configuration:
         pprint.pprint(self.config)
         self.template_download = Template(self.config['general']['download_path'])
         self.template_download.braced = True
+        self.langs = self.config['general']['langs'].split(',')
+        self.langs = [x.strip(' ') for x in self.langs]
+        self.regions = self.config['general']['regions'].split(',')
+        self.regions = [x.strip(' ') for x in self.regions]
         print("Reading config file: '" + config_file + "'")
 
     def print(self):
@@ -323,7 +327,6 @@ if __name__ == "__main__":
             help='Print the systems id and system name and exit')
     parser.set_defaults(list_systems=False)
     args = parser.parse_args()
-    langs = ['en', 'es']
     
    
     if not args.list_systems and args.roms_dir is None:
