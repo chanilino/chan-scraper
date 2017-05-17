@@ -16,7 +16,7 @@ import configparser
 class Configuration:
     def __str__ (self):
         return self.config.__str__()
-    def __init__(self, config_file = "./chan-scraper.ini"):
+    def __init__(self, config_file = "chan-scraper.ini"):
         #self.config = configparser.ConfigParser(interpolation=configparser.ExtendedInterpolation())
         self.config = configparser.ConfigParser()
         self.config.read(config_file)
@@ -28,6 +28,9 @@ class Configuration:
             print(section)
             for key, value in self.config[section].items():
                 print("    " + key + ": " + value)
+    def get_download_path(game):
+        # parse config and return the string
+        return game.name
 
 
 class Media:
