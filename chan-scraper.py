@@ -12,7 +12,7 @@ import queue
 import urllib 
 import time
 import configparser
-import string.Template
+from string import Template
 
 class Configuration:
     def __str__ (self):
@@ -22,20 +22,27 @@ class Configuration:
         self.config = configparser.ConfigParser()
         self.config.read(config_file)
         pprint.pprint(self.config)
-        self.template_download = self.config['general']['download_path']
+        self.template_download = Template(self.config['general']['download_path'])
+        self.template_download.braced = True
         print("Reading config file: '" + config_file + "'")
 
     def print(self):
         for section in self.config.sections():
-            print(section)
+            print("[" + section + "]")
             for key, value in self.config[section].items():
                 print("    " + key + ": " + value)
-    def get_download_path(game):
+    def get_download_path(self):
         # parse config and return the string
-        d = dict(system = game.system, media = game.media)
-        template_download.safe_substitute(d) 
-        return game.name
-
+        d = dict(
+                base_download_dir = "base_dir",
+                media_dir = "media_dir",
+                game_name = "GAME",
+                media_extension = "png",
+                system = "NES")
+        path = self.template_download.substitute(d)
+        print("path to download: '" + path + "'")
+        return path
+        
 
 class Media:
     def __str__(self):  
@@ -306,6 +313,7 @@ def worker_download(q):
 if __name__ == "__main__":
     config = Configuration()
     config.print()
+    config.get_download_path()
     exit(0)
     parser = argparse.ArgumentParser()
     parser.add_argument('roms_dir',nargs='?' ,help='the roms dir to scrape')
