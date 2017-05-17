@@ -12,6 +12,7 @@ import queue
 import urllib 
 import time
 import configparser
+import string.Template
 
 class Configuration:
     def __str__ (self):
@@ -21,6 +22,7 @@ class Configuration:
         self.config = configparser.ConfigParser()
         self.config.read(config_file)
         pprint.pprint(self.config)
+        self.template_download = self.config['general']['download_path']
         print("Reading config file: '" + config_file + "'")
 
     def print(self):
@@ -30,6 +32,8 @@ class Configuration:
                 print("    " + key + ": " + value)
     def get_download_path(game):
         # parse config and return the string
+        d = dict(system = game.system, media = game.media)
+        template_download.safe_substitute(d) 
         return game.name
 
 
