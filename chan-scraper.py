@@ -11,6 +11,24 @@ import threading
 import queue
 import urllib 
 import time
+import configparser
+
+class Configuration:
+    def __str__ (self):
+        return self.config.__str__()
+    def __init__(self, config_file = "./chan-scraper.ini"):
+        #self.config = configparser.ConfigParser(interpolation=configparser.ExtendedInterpolation())
+        self.config = configparser.ConfigParser()
+        self.config.read(config_file)
+        pprint.pprint(self.config)
+        print("Reading config file: '" + config_file + "'")
+
+    def print(self):
+        for section in self.config.sections():
+            print(section)
+            for key, value in self.config[section].items():
+                print("    " + key + ": " + value)
+
 
 class Media:
     def __str__(self):  
@@ -279,6 +297,9 @@ def worker_download(q):
 
 
 if __name__ == "__main__":
+    config = Configuration()
+    config.print()
+    exit(0)
     parser = argparse.ArgumentParser()
     parser.add_argument('roms_dir',nargs='?' ,help='the roms dir to scrape')
     parser.add_argument('-u', '--user', required=True ,help='The user in screenscraper.fr')
