@@ -31,6 +31,7 @@ class Game:
     def create_media(self, node, node_name, download_path):
         return Media(node[node_name],  node[node_name + '_crc'], 
                 node[node_name+ '_md5'], node[node_name + '_sha1'], download_path)
+
     def __str__(self):  
         return "Name: " + self.name + ' : ' + str(self.romregion)
 
@@ -44,11 +45,9 @@ class Game:
             line += self.cloneof
         line += ";" 
 
-
-        line += "TODO_CLONEOF;"
         line += self.date + ";" 
         line += self.developer + ";" 
-        line += self.category + ";" 
+        line += ", ".join(self.category) + ";" 
         line += self.players + ";" 
         line += self.rotation + ";" 
         # TODO: Check if other roms have control
@@ -57,6 +56,7 @@ class Game:
         line += ";" 
         #DisplayCount;DisplayType;AltRomname;AltTitle;Extra;Buttons
         line += ";;;;;"
+        return line
 
 
     def __init__(self, filepath, node, systems, langs, user_regions):
@@ -73,14 +73,16 @@ class Game:
     
         #print('sinopsys_key: ' + str(synopsis_key))
         self.sinopsys = node['jeu']['synopsis'][synopsis_key]
+        self.cloneof = node['jeu']['cloneof']
         
         dates_key = get_key_from_prefix(node['jeu']['dates'], 'date_', langs)
         self.date = node['jeu']['dates'][dates_key]
         
-        genres_key = get_key_from_prefix(node['jeu']['genres'], 'genres__', langs)
+        genres_key = get_key_from_prefix(node['jeu']['genres'], 'genres_', langs)
+        print("genres_key: " + genres_key)
         self.category = node['jeu']['genres'][genres_key]
         
-        self.developer = node['jeu']['developeur'] 
+        self.developer = node['jeu']['developpeur'] 
         self.players = node['jeu']['joueurs'] 
         self.rotation = node ['jeu']['rotation']
         #print("sinopsys:")
@@ -94,7 +96,7 @@ class Game:
         
         
         media_wheels_region_key = get_key_from_prefix(medias['media_wheels'],'media_wheel_', romregion + user_regions)
-       
+        print("media_wheels_region_key" + media_wheels_region_key) 
         self.wheel = self.create_media(medias['media_wheels'], media_wheels_region_key, 
                 os.path.join(self.base_download_dir,'wheel', self.name))
        
@@ -145,7 +147,7 @@ class MultipleHashes:
 
 
 
-def get_key_from_prefix (dictionary, prefix_key, sufixes_keys):
+def get_key_from_prefix (dictionary, prefix_key, sufixes_keys): 
     found_key = False
     for sufix_key in sufixes_keys:
         result_key = prefix_key + sufix_key
@@ -155,7 +157,18 @@ def get_key_from_prefix (dictionary, prefix_key, sufixes_keys):
 
     # if not return first key found
     if not found_key:
-        result_key = next (iter (dictionary.keys()))
+        result_key = None
+        for key, value in dictionary.items():
+            # Ensure we dont have more than one '_':
+            # if we search 'prefix_key' we dont want 'prefix_key_subkey1_subkey2'
+            index = key.find(prefix_key);
+            if(index >= 0):
+#                print("result_key0 : " + key)
+                index_ = key[len(prefix_key):].find("_")
+                if(index_ < 0 ):
+#                    print("result_key1: " + key)
+                    result_key = key
+                    break
 
     return result_key
 
@@ -297,7 +310,6 @@ if __name__ == "__main__":
         exit(0)
 
     print('TODO: use ConfigParser configparser.ExtendedInterpolation')
-    exit(0)
     max_ss_threads = ss.max_threads
     max_ss_threads = 1
     queue_files = queue.Queue()
