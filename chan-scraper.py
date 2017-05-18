@@ -16,7 +16,13 @@ from string import Template
 
 class Configuration:
     def __str__ (self):
-        return self.config.__str__()
+        result = ""
+        for section in self.config.sections():
+            result += ("[" + section + "]\n")
+            for key, value in self.config[section].items():
+                result += ("    " + key + ": " + value + "\n")
+        return result
+
     def __init__(self, config_file = "chan-scraper.ini"):
         #self.config = configparser.ConfigParser(interpolation=configparser.ExtendedInterpolation())
         self.config = configparser.ConfigParser()
@@ -30,11 +36,7 @@ class Configuration:
         self.regions = [x.strip(' ') for x in self.regions]
         print("Reading config file: '" + config_file + "'")
 
-    def print(self):
-        for section in self.config.sections():
-            print("[" + section + "]")
-            for key, value in self.config[section].items():
-                print("    " + key + ": " + value)
+
     def get_download_path(self):
         # parse config and return the string
         d = dict(
@@ -316,7 +318,7 @@ def worker_download(q):
 
 if __name__ == "__main__":
     config = Configuration()
-    config.print()
+    print(config)
     config.get_download_path()
     exit(0)
     parser = argparse.ArgumentParser()
