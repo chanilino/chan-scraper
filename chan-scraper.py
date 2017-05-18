@@ -75,7 +75,10 @@ class Game:
 
     def to_str_attractmode_format(self):
         #Name;Title;Emulator;CloneOf;Year;Manufacturer;Category;Players;Rotation;Control;Status;DisplayCount;DisplayType;AltRomname;AltTitle;Extra;Buttons
-        line =  self.name +  ";" + self.name + ";"
+        # Name: it is rom file path
+        line =  self.filepath +  ";" 
+        # Title to be displayed
+        line += self.name + ";"
         # TODO: Check emulator from cfg
         line += "TODO_EMULATOR;"
         #Check cloneof == 0
@@ -90,20 +93,22 @@ class Game:
         line += self.rotation + ";" 
         # TODO: Check if other roms have control
         line += ";" 
-        # TODO: Status
+        # TODO: Status of the rom emulation
         line += ";" 
-        #DisplayCount;DisplayType;AltRomname;AltTitle;Extra;Buttons
+        #DisplayCount;DisplayType;AltRomname;AltTitle;Extra;
         line += ";;;;;"
+        #TODO: Buttons check if we can extract buttons
+        line += ""
         return line
 
 
     def __init__(self, filepath, node, systems, langs, user_regions):
         self.systemid = node['jeu']['systemeid']
+        self.filepath = filepath
         print("System Id: " + str(self.systemid))
         #pprint.pprint(systems)
         self.system = systems[int(self.systemid)]
         print("System Id: " + str(self.systemid)+ ' : ' + self.system)
-       
         self.name = node['jeu']['nom']
         romregion = node ['jeu']['regionshortnames']
 
@@ -211,16 +216,16 @@ def get_key_from_prefix (dictionary, prefix_key, sufixes_keys):
     return result_key
 
 class ScreenScraperFrApi:
-    def __init__(self, ssid, sspassword, langs):
+    def __init__(self, ssid, sspassword, config):
         self.url_base = 'https://www.screenscraper.fr/api/'
         self.devid = 'chanilino'
         self.devpassword = 'rGU9nm4Pr39GVnC2'
         self.softname = 'chan-scraper-0.1'
         self.max_threads = 1
-        self.user_regions = ['eu']
-        self.langs = langs
         self.ssid = ssid
         self.sspassword = sspassword
+        self.user_regions = config.regions
+        self.langs = config.langs
         self.systems = dict()
 
     def __get_payload_base(self):
@@ -265,6 +270,9 @@ class ScreenScraperFrApi:
         r = requests.get(self.url_base + 'jeuInfos.php', params=payload)
         r_json = self.__get_json_from_request(r)
         game = Game(hashes.filepath, r_json['response'], self.systems, self.langs, self.user_regions)
+        f = open('traces/' + game.name +  ".json" , 'w')
+        f.write(r.text)
+        f.close()
         return game
 
 
@@ -319,8 +327,7 @@ def worker_download(q):
 if __name__ == "__main__":
     config = Configuration()
     print(config)
-    config.get_download_path()
-    exit(0)
+    
     parser = argparse.ArgumentParser()
     parser.add_argument('roms_dir',nargs='?' ,help='the roms dir to scrape')
     parser.add_argument('-u', '--user', required=True ,help='The user in screenscraper.fr')
@@ -343,7 +350,7 @@ if __name__ == "__main__":
     print(args.user)
     print(args.password)
     pprint.pprint(args.list_systems)
-    ss = ScreenScraperFrApi(args.user, args.password, langs)
+    ss = ScreenScraperFrApi(args.user, args.password, config)
     ss.get_platform_info()
 
     if args.list_systems:
