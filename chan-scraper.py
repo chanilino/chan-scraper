@@ -85,7 +85,7 @@ class Game:
 
         line += self.date + ";" 
         line += self.developer + ";" 
-        line += ", ".join(self.category) + ";" 
+        line += "/ ".join(self.category) + ";" 
         line += self.players + ";" 
         line += self.rotation + ";" 
         # TODO: Check if other roms have control
