@@ -110,26 +110,23 @@ class Game:
         self.system = systems[int(self.systemid)]
         print("System Id: " + str(self.systemid)+ ' : ' + self.system)
         self.name = node['jeu']['nom']
-        romregion = node ['jeu']['regionshortnames']
+        romregion = node ['jeu'].get('regionshortnames', [])
 
         synopsis_key = get_key_from_prefix(node['jeu']['synopsis'], 'synopsis_', langs)
     
-        #print('sinopsys_key: ' + str(synopsis_key))
-        self.sinopsys = node['jeu']['synopsis'][synopsis_key]
-        self.cloneof = node['jeu']['cloneof']
+        self.sinopsys = node['jeu']['synopsis'].get(synopsis_key, "")
+        self.cloneof = node['jeu'].get('cloneof', "")
         
         dates_key = get_key_from_prefix(node['jeu']['dates'], 'date_', langs)
-        self.date = node['jeu']['dates'][dates_key]
+        self.date = node['jeu']['dates'].get(dates_key, "")
         
         genres_key = get_key_from_prefix(node['jeu']['genres'], 'genres_', langs)
         print("genres_key: " + genres_key)
-        self.category = node['jeu']['genres'][genres_key]
+        self.category = node['jeu']['genres'].get(genres_key, "")
         
-        self.developer = node['jeu']['developpeur'] 
-        self.players = node['jeu']['joueurs'] 
-        self.rotation = node ['jeu']['rotation']
-        #print("sinopsys:")
-        #print(sinopsys)
+        self.developer = node['jeu'].get('developpeur', "")
+        self.players = node['jeu'].get('joueurs', "")
+        self.rotation = node ['jeu'].get('rotation', "")
         medias = node['jeu']['medias']
     
         self.base_download_dir = os.path.join('media', self.system)
@@ -139,7 +136,7 @@ class Game:
         
         
         media_wheels_region_key = get_key_from_prefix(medias['media_wheels'],'media_wheel_', romregion + user_regions)
-        print("media_wheels_region_key" + media_wheels_region_key) 
+        
         self.wheel = self.create_media(medias['media_wheels'], media_wheels_region_key, 
                 os.path.join(self.base_download_dir,'wheel', self.name))
        
