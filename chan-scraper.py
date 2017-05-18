@@ -39,9 +39,9 @@ class Configuration:
 
     def get_download_path(self):
         # parse config and return the string
+        # TODO: hay que bajar a  los directorios: 
+        #  - flyer marquee snap wheel 
         d = dict(
-                base_download_dir = "base_dir",
-                media_dir = "media_dir",
                 game_name = "GAME",
                 media_extension = "png",
                 system = "NES")
@@ -75,8 +75,8 @@ class Game:
 
     def to_str_attractmode_format(self):
         #Name;Title;Emulator;CloneOf;Year;Manufacturer;Category;Players;Rotation;Control;Status;DisplayCount;DisplayType;AltRomname;AltTitle;Extra;Buttons
-        # Name: it is rom file path
-        line =  self.filepath +  ";" 
+        # Name: it is rom filename  without extension and without dir_path
+        line = os.path.splitext(os.path.basename(self.filepath))[0]  +  ";" 
         # Title to be displayed
         line += self.name + ";"
         # TODO: Check emulator from cfg
