@@ -37,14 +37,16 @@ class Configuration:
         print("Reading config file: '" + config_file + "'")
 
 
-    def get_download_path(self):
+    def get_download_path(self, game, media):
         # parse config and return the string
         # TODO: hay que bajar a  los directorios: 
-        #  - flyer marquee snap wheel 
+        #  - flyer marquee snap wheel
+        media_dir = self.config['general'] [media + '_dir']
+        emulator = self.config[game.system].get('emulator', 'TODO_EMULATOR')
         d = dict(
-                game_name = "GAME",
-                media_extension = "png",
-                system = "NES")
+                game_filename = game.filename,
+                emulator = emulator
+                media_dir = media_dir)
         path = self.template_download.substitute(d)
         print("path to download: '" + path + "'")
         return path
@@ -76,7 +78,7 @@ class Game:
     def to_str_attractmode_format(self):
         #Name;Title;Emulator;CloneOf;Year;Manufacturer;Category;Players;Rotation;Control;Status;DisplayCount;DisplayType;AltRomname;AltTitle;Extra;Buttons
         # Name: it is rom filename  without extension and without dir_path
-        line = os.path.splitext(os.path.basename(self.filepath))[0]  +  ";" 
+        line = self.filename  +  ";" 
         # Title to be displayed
         line += self.name + ";"
         # TODO: Check emulator from cfg
@@ -102,9 +104,14 @@ class Game:
         return line
 
 
-    def __init__(self, filepath, node, systems, langs, user_regions):
+    def __init__(self, filepath, node, systems, config):
+        langs = config.langs
+        user_regions = config.regions
+
         self.systemid = node['jeu']['systemeid']
         self.filepath = filepath
+        self.filename = os.path.splitext(os.path.basename(self.filepath))[0]
+    
         print("System Id: " + str(self.systemid))
         #pprint.pprint(systems)
         self.system = systems[int(self.systemid)]
@@ -131,39 +138,42 @@ class Game:
     
         self.base_download_dir = os.path.join('media', self.system)
 
-        self.screenshot = self.create_media(medias, 'media_screenshot', os.path.join(self.base_download_dir,'screenshot', self.name))
-        self.video = self.create_media(medias, 'media_video', os.path.join(self.base_download_dir,'screenshot', self.name))
+        self.screenshot = self.create_media(medias, 'media_screenshot', config.get_download_path(self, 'snap'), self.name))
+        self.video = self.create_media(medias, 'media_video', config.get_download_path(self, 'video'), self.name))
         
         
         media_wheels_region_key = get_key_from_prefix(medias['media_wheels'],'media_wheel_', romregion + user_regions)
         
         self.wheel = self.create_media(medias['media_wheels'], media_wheels_region_key, 
-                os.path.join(self.base_download_dir,'wheel', self.name))
+                config.get_download_path(self, 'wheel'), self.name)
        
         media_boxstexture_region_key = get_key_from_prefix(medias['media_boxs']['media_boxstexture'], 
                 'media_boxtexture_', romregion + user_regions)
+        #TODO: put a config option to choose type of preferred media box
         self.boxtexture = self.create_media(medias['media_boxs']['media_boxstexture'], media_boxstexture_region_key
-               , os.path.join(self.base_download_dir,'boxtexture', self.name) )
+               , config.get_download_path(self, 'boxtexture'), self.name) 
 
         media_boxs2d_region_key = get_key_from_prefix(medias['media_boxs']['media_boxs2d'], 
                 'media_box2d_', romregion + user_regions)
         self.box2d = self.create_media(medias['media_boxs']['media_boxs2d'], media_boxs2d_region_key, 
-                os.path.join(self.base_download_dir,'box2d', self.name))
+                config.get_download_path(self, 'box2d'), self.name) 
 
         media_boxs2d_side_region_key = get_key_from_prefix(medias['media_boxs']['media_boxs2d-side'], 
                 'media_box2d-side_', romregion + user_regions)
         self.box2d_side = self.create_media(medias['media_boxs']['media_boxs2d-side'], 
-                media_boxs2d_side_region_key, os.path.join(self.base_download_dir,'box2d-side', self.name)  )
+                media_boxs2d_side_region_key,
+                config.get_download_path(self, 'box2d-side'), self.name) 
 
         media_boxs2d_back_region_key = get_key_from_prefix(medias['media_boxs']['media_boxs2d-back'], 
                 'media_box2d-back_', romregion + user_regions)
         self.box2d_back = self.create_media(medias['media_boxs']['media_boxs2d-back'],
-                media_boxs2d_back_region_key, os.path.join(self.base_download_dir,'box2d-back', self.name))
+                media_boxs2d_back_region_key,
+                config.get_download_path(self, 'box2d-back'), self.name) 
 
         media_box3d_region_key = get_key_from_prefix(medias['media_boxs']['media_boxs3d'], 
                 'media_box3d_', romregion + user_regions)
         self.box3d = self.create_media(medias['media_boxs']['media_boxs3d'], media_box3d_region_key, 
-                os.path.join(self.base_download_dir,'box3d', self.name))
+                config.get_download_path(self, 'box3d'), self.name) 
         self.romregion = romregion
 
 
@@ -224,6 +234,7 @@ class ScreenScraperFrApi:
         self.user_regions = config.regions
         self.langs = config.langs
         self.systems = dict()
+        self.config = config
 
     def __get_payload_base(self):
         payload = {}
@@ -266,10 +277,10 @@ class ScreenScraperFrApi:
         payload['sha1'] = hashes.sha1sum 
         r = requests.get(self.url_base + 'jeuInfos.php', params=payload)
         r_json = self.__get_json_from_request(r)
-        game = Game(hashes.filepath, r_json['response'], self.systems, self.langs, self.user_regions)
-        f = open('traces/' + game.name +  ".json" , 'w')
-        f.write(r.text)
-        f.close()
+        game = Game(hashes.filepath, r_json['response'], self.systems, self.config)
+#        f = open('traces/' + game.name +  ".json" , 'w')
+#        f.write(r.text)
+#        f.close()
         return game
 
 
@@ -312,11 +323,12 @@ def worker_download(q):
         download_media(game.screenshot)
         download_media(game.video)
         download_media(game.wheel)
+        # TODO: put a config option to chose what we want to download
         download_media(game.boxtexture)
-        download_media(game.box2d)
-        download_media(game.box2d_side)
-        download_media(game.box2d_back)
-        download_media(game.box3d)
+#        download_media(game.box2d)
+#        download_media(game.box2d_side)
+#        download_media(game.box2d_back)
+#        download_media(game.box3d)
 
         q.task_done()
 
