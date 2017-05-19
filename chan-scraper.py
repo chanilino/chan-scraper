@@ -27,7 +27,6 @@ class Configuration:
         #self.config = configparser.ConfigParser(interpolation=configparser.ExtendedInterpolation())
         self.config = configparser.ConfigParser()
         self.config.read(config_file)
-        pprint.pprint(self.config)
         self.template_download = Template(self.config['general']['download_path'])
         self.template_download.braced = True
         self.langs = self.config['general']['langs'].split(',')
@@ -45,11 +44,16 @@ class Configuration:
         emulator = self.config[game.system].get('emulator', 'TODO_EMULATOR')
         d = dict(
                 game_filename = game.filename,
-                emulator = emulator
-                media_dir = media_dir)
+                emulator = emulator,
+                media_dir = media_dir
+                )
         path = self.template_download.substitute(d)
         print("path to download: '" + path + "'")
         return path
+    def get_emulator(self, game):
+        emulator=  self.config[game.system].get('emulator', "TODO_EMULATOR")
+        print("Getting emulator for system: " + game.system + ": " + emulator)
+        return emulator
         
 
 class Media:
@@ -75,14 +79,14 @@ class Game:
     def __str__(self):  
         return "Name: " + self.name + ' : ' + str(self.romregion)
 
+
     def to_str_attractmode_format(self):
         #Name;Title;Emulator;CloneOf;Year;Manufacturer;Category;Players;Rotation;Control;Status;DisplayCount;DisplayType;AltRomname;AltTitle;Extra;Buttons
         # Name: it is rom filename  without extension and without dir_path
         line = self.filename  +  ";" 
         # Title to be displayed
         line += self.name + ";"
-        # TODO: Check emulator from cfg
-        line += "TODO_EMULATOR;"
+        line += self.emulator + ";"
         #Check cloneof == 0
         if self.cloneof != "0":
             line += self.cloneof
@@ -107,7 +111,6 @@ class Game:
     def __init__(self, filepath, node, systems, config):
         langs = config.langs
         user_regions = config.regions
-
         self.systemid = node['jeu']['systemeid']
         self.filepath = filepath
         self.filename = os.path.splitext(os.path.basename(self.filepath))[0]
@@ -115,6 +118,7 @@ class Game:
         print("System Id: " + str(self.systemid))
         #pprint.pprint(systems)
         self.system = systems[int(self.systemid)]
+        self.emulator = config.get_emulator(self)
         print("System Id: " + str(self.systemid)+ ' : ' + self.system)
         self.name = node['jeu']['nom']
         romregion = node ['jeu'].get('regionshortnames', [])
@@ -138,43 +142,43 @@ class Game:
     
         self.base_download_dir = os.path.join('media', self.system)
 
-        self.screenshot = self.create_media(medias, 'media_screenshot', config.get_download_path(self, 'snap'), self.name))
-        self.video = self.create_media(medias, 'media_video', config.get_download_path(self, 'video'), self.name))
+        self.screenshot = self.create_media(medias, 'media_screenshot', config.get_download_path(self, 'snap'))
+        self.video = self.create_media(medias, 'media_video', config.get_download_path(self, 'video'))
         
         
         media_wheels_region_key = get_key_from_prefix(medias['media_wheels'],'media_wheel_', romregion + user_regions)
         
         self.wheel = self.create_media(medias['media_wheels'], media_wheels_region_key, 
-                config.get_download_path(self, 'wheel'), self.name)
+                config.get_download_path(self, 'wheel'))
        
-        media_boxstexture_region_key = get_key_from_prefix(medias['media_boxs']['media_boxstexture'], 
-                'media_boxtexture_', romregion + user_regions)
-        #TODO: put a config option to choose type of preferred media box
-        self.boxtexture = self.create_media(medias['media_boxs']['media_boxstexture'], media_boxstexture_region_key
-               , config.get_download_path(self, 'boxtexture'), self.name) 
+#        media_boxstexture_region_key = get_key_from_prefix(medias['media_boxs']['media_boxstexture'], 
+#                'media_boxtexture_', romregion + user_regions)
+#        #TODO: put a config option to choose type of preferred media box
+#        self.boxtexture = self.create_media(medias['media_boxs']['media_boxstexture'], media_boxstexture_region_key
+#               , config.get_download_path(self, 'boxtexture')) 
 
         media_boxs2d_region_key = get_key_from_prefix(medias['media_boxs']['media_boxs2d'], 
                 'media_box2d_', romregion + user_regions)
         self.box2d = self.create_media(medias['media_boxs']['media_boxs2d'], media_boxs2d_region_key, 
-                config.get_download_path(self, 'box2d'), self.name) 
+                config.get_download_path(self, 'flyer')) 
 
-        media_boxs2d_side_region_key = get_key_from_prefix(medias['media_boxs']['media_boxs2d-side'], 
-                'media_box2d-side_', romregion + user_regions)
-        self.box2d_side = self.create_media(medias['media_boxs']['media_boxs2d-side'], 
-                media_boxs2d_side_region_key,
-                config.get_download_path(self, 'box2d-side'), self.name) 
-
-        media_boxs2d_back_region_key = get_key_from_prefix(medias['media_boxs']['media_boxs2d-back'], 
-                'media_box2d-back_', romregion + user_regions)
-        self.box2d_back = self.create_media(medias['media_boxs']['media_boxs2d-back'],
-                media_boxs2d_back_region_key,
-                config.get_download_path(self, 'box2d-back'), self.name) 
-
-        media_box3d_region_key = get_key_from_prefix(medias['media_boxs']['media_boxs3d'], 
-                'media_box3d_', romregion + user_regions)
-        self.box3d = self.create_media(medias['media_boxs']['media_boxs3d'], media_box3d_region_key, 
-                config.get_download_path(self, 'box3d'), self.name) 
-        self.romregion = romregion
+#        media_boxs2d_side_region_key = get_key_from_prefix(medias['media_boxs']['media_boxs2d-side'], 
+#                'media_box2d-side_', romregion + user_regions)
+#        self.box2d_side = self.create_media(medias['media_boxs']['media_boxs2d-side'], 
+#                media_boxs2d_side_region_key,
+#                config.get_download_path(self, 'box2d-side')) 
+#
+#        media_boxs2d_back_region_key = get_key_from_prefix(medias['media_boxs']['media_boxs2d-back'], 
+#                'media_box2d-back_', romregion + user_regions)
+#        self.box2d_back = self.create_media(medias['media_boxs']['media_boxs2d-back'],
+#                media_boxs2d_back_region_key,
+#                config.get_download_path(self, 'box2d-back')) 
+#
+#        media_box3d_region_key = get_key_from_prefix(medias['media_boxs']['media_boxs3d'], 
+#                'media_box3d_', romregion + user_regions)
+#        self.box3d = self.create_media(medias['media_boxs']['media_boxs3d'], media_box3d_region_key, 
+#                config.get_download_path(self, 'box3d')) 
+#        self.romregion = romregion
 
 
 class MultipleHashes:
@@ -263,11 +267,11 @@ class ScreenScraperFrApi:
         response = r_json['response']
         self.max_threads = int(response['ssuser'] ['maxthreads'])
         print("max_threads: " + str(self.max_threads))
-        pprint.pprint(response['systemes'])
+#        pprint.pprint(response['systemes'])
         systems = response['systemes']
         for system in systems:
             self.systems[system['id']] = system['noms']['nom_eu']
-            print('system id: ' + str(system['id']) + ': ' + self.systems[system['id']] )
+#            print('system id: ' + str(system['id']) + ': ' + self.systems[system['id']] )
 
 
     def get_game_info (self, hashes):
@@ -307,6 +311,7 @@ def download_media(media):
     if r.status_code == 200:
         dir_download = os.path.dirname(media.download_path) 
         os.makedirs(dir_download, mode=0o755, exist_ok=True)
+        print("Downloading to: " + media.download_path)
         with open(media.download_path, 'wb') as f:
             for chunk in r.iter_content(1024):
                 f.write(chunk)
@@ -320,12 +325,16 @@ def worker_download(q):
         game = ss.get_game_info(hashes)
 
         print("attractmode: " + game.to_str_attractmode_format())
+        f = open(game.system + ".txt" , 'a')
+        f.write(game.to_str_attractmode_format() + "\n")
+        f.close()
         download_media(game.screenshot)
         download_media(game.video)
         download_media(game.wheel)
         # TODO: put a config option to chose what we want to download
-        download_media(game.boxtexture)
-#        download_media(game.box2d)
+        # flyer is the name for boxes
+#        download_media(game.flyer)
+        download_media(game.box2d)
 #        download_media(game.box2d_side)
 #        download_media(game.box2d_back)
 #        download_media(game.box3d)
@@ -335,12 +344,11 @@ def worker_download(q):
 
 if __name__ == "__main__":
     config = Configuration()
-    print(config)
     
     parser = argparse.ArgumentParser()
     parser.add_argument('roms_dir',nargs='?' ,help='the roms dir to scrape')
-    parser.add_argument('-u', '--user', required=True ,help='The user in screenscraper.fr')
-    parser.add_argument('-p', '--password', required=True ,help='The password in screenscraper.fr')
+    parser.add_argument('-u', '--user', required=False ,help='The user in screenscraper.fr')
+    parser.add_argument('-p', '--password', required=False ,help='The password in screenscraper.fr')
     parser.add_argument('-l', '--list-systems', dest='list_systems', action='store_true', 
             help='Print the systems id and system name and exit')
     parser.set_defaults(list_systems=False)
@@ -352,21 +360,26 @@ if __name__ == "__main__":
         parser.print_help() 
         exit(1)
 
+    user = args.user
+    password = args.password
+    
+    if not user:
+        user = config.config['general']['user']
+    if not password:
+        user = config.config['general']['password']
+
     roms_path = args.roms_dir
     max_cpu_threads = 4 
 
-    print(roms_path)
-    print(args.user)
-    print(args.password)
-    pprint.pprint(args.list_systems)
-    ss = ScreenScraperFrApi(args.user, args.password, config)
+    ss = ScreenScraperFrApi(user, password, config)
     ss.get_platform_info()
 
     if args.list_systems:
-        print("TODO: list platform info!")
+        pprint.pprint(ss.systems)
+#        for id_system, name_system in ss.systems:
+#            print(str(id_system) + ": " + str(name_system))
         exit(0)
 
-    print('TODO: use ConfigParser configparser.ExtendedInterpolation')
     max_ss_threads = ss.max_threads
     max_ss_threads = 1
     queue_files = queue.Queue()
