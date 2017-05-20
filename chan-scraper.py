@@ -14,6 +14,53 @@ import time
 import configparser
 from string import Template
 
+def get_key_from_prefix (dictionary, prefix_key, sufixes_keys): 
+    found_key = False
+    for sufix_key in sufixes_keys:
+        result_key = prefix_key + sufix_key
+        if result_key in dictionary:
+            found_key = True
+            break
+
+    # if not return first key found
+    if not found_key:
+        result_key = None
+        for key, value in dictionary.items():
+            # Ensure we dont have more than one '_':
+            # if we search 'prefix_key' we dont want 'prefix_key_subkey1_subkey2'
+            index = key.find(prefix_key);
+            if(index >= 0):
+#                print("result_key0 : " + key)
+                index_ = key[len(prefix_key):].find("_")
+                if(index_ < 0 ):
+#                    print("result_key1: " + key)
+                    result_key = key
+                    break
+
+    return result_key
+
+def get_value_from_prefix (dictionary, prefix_key, sufixes_keys, default_value = None): 
+    key = get_key_from_prefix(dictionary, prefix_key, sufixes_keys)
+    return dictionary.get(key, default_value)
+
+
+
+def get_value_from_list_keys(dictionary, list_keys, default_value = None):
+    tmp_result = dictionary
+    for key in list_keys:
+        if key in tmp_result:
+            tmp_result = tmp_result[key]
+        else:
+            return default_value
+    return tmp_result
+
+def get_value_from_list_prefix(dictionary, list_keys, prefix_key, sufixes_keys, default_value = None):
+    node = get_value_from_list_keys(dictionary, list_keys)
+    if (not node):
+        return default_value
+    return get_value_from_prefix(node, prefix_key, sufixes_keys, default_value)
+    
+
 class Configuration:
     def __str__ (self):
         result = ""
@@ -40,7 +87,7 @@ class Configuration:
         # parse config and return the string
         # TODO: hay que bajar a  los directorios: 
         #  - flyer marquee snap wheel
-        media_dir = self.config['general'] [media + '_dir']
+        media_dir = self.config['general'].get(media + '_dir', media)
         emulator = self.config[game.system].get('emulator', 'TODO_EMULATOR')
         d = dict(
                 game_filename = game.filename,
@@ -48,8 +95,8 @@ class Configuration:
                 media_dir = media_dir
                 )
         path = self.template_download.substitute(d)
-        print("path to download: '" + path + "'")
         return path
+
     def get_emulator(self, game):
         emulator=  self.config[game.system].get('emulator', "TODO_EMULATOR")
         print("Getting emulator for system: " + game.system + ": " + emulator)
@@ -67,14 +114,18 @@ class Media:
         self.sha1sum = sha1sum
         parsed = urllib.parse.urlparse(url)
         extension = urllib.parse.parse_qs(parsed.query)['mediaformat'][0]
-        print('type: ' +  extension)
+        #print('type: ' +  extension)
         self.download_path = download_path + '.' + extension
-        print(self.url + ': ' + self.crc32 + ': ' + self.md5 + ': ' + self.sha1sum )
+#        print("Url: " + self.url + ': ' + self.crc32 + ': ' + self.md5 + ': ' + self.sha1sum )
+        print("Download to: " + self.download_path )
 
 class Game:
     def create_media(self, node, node_name, download_path):
-        return Media(node[node_name],  node[node_name + '_crc'], 
-                node[node_name+ '_md5'], node[node_name + '_sha1'], download_path)
+        node_media = node.get(node_name, None)
+        if  not node_media:
+            return None
+        return Media(node_media,  node.get(node_name + '_crc', None), 
+                node.get(node_name+ '_md5', None), node.get(node_name + '_sha1', None), download_path)
 
     def __str__(self):  
         return "Name: " + self.name + ' : ' + str(self.romregion)
@@ -111,74 +162,69 @@ class Game:
     def __init__(self, filepath, node, systems, config):
         langs = config.langs
         user_regions = config.regions
-        self.systemid = node['jeu']['systemeid']
         self.filepath = filepath
         self.filename = os.path.splitext(os.path.basename(self.filepath))[0]
-    
-        print("System Id: " + str(self.systemid))
-        #pprint.pprint(systems)
-        self.system = systems[int(self.systemid)]
-        self.emulator = config.get_emulator(self)
-        print("System Id: " + str(self.systemid)+ ' : ' + self.system)
+        
+        #FIXME: the needed fields launch exception the other NO
         self.name = node['jeu']['nom']
-        romregion = node ['jeu'].get('regionshortnames', [])
+        self.systemid = node['jeu'][ 'systemeid']
+        self.system = systems[int(self.systemid)]
 
-        synopsis_key = get_key_from_prefix(node['jeu']['synopsis'], 'synopsis_', langs)
-    
-        self.sinopsys = node['jeu']['synopsis'].get(synopsis_key, "")
+        # Not compulsory
+        self.emulator = config.get_emulator(self)
         self.cloneof = node['jeu'].get('cloneof', "")
-        
-        dates_key = get_key_from_prefix(node['jeu']['dates'], 'date_', langs)
-        self.date = node['jeu']['dates'].get(dates_key, "")
-        
-        genres_key = get_key_from_prefix(node['jeu']['genres'], 'genres_', langs)
-        print("genres_key: " + genres_key)
-        self.category = node['jeu']['genres'].get(genres_key, "")
-        
         self.developer = node['jeu'].get('developpeur', "")
         self.players = node['jeu'].get('joueurs', "")
         self.rotation = node ['jeu'].get('rotation', "")
-        medias = node['jeu']['medias']
-    
-        self.base_download_dir = os.path.join('media', self.system)
-
-        self.screenshot = self.create_media(medias, 'media_screenshot', config.get_download_path(self, 'snap'))
-        self.video = self.create_media(medias, 'media_video', config.get_download_path(self, 'video'))
+        romregion = node ['jeu'].get('regionshortnames', [])
+        self.romregion = romregion
         
-        
-        media_wheels_region_key = get_key_from_prefix(medias['media_wheels'],'media_wheel_', romregion + user_regions)
-        
-        self.wheel = self.create_media(medias['media_wheels'], media_wheels_region_key, 
-                config.get_download_path(self, 'wheel'))
+        #print("System Id: " + str(self.systemid)+ ' : ' + self.system)
        
-#        media_boxstexture_region_key = get_key_from_prefix(medias['media_boxs']['media_boxstexture'], 
-#                'media_boxtexture_', romregion + user_regions)
-#        #TODO: put a config option to choose type of preferred media box
-#        self.boxtexture = self.create_media(medias['media_boxs']['media_boxstexture'], media_boxstexture_region_key
-#               , config.get_download_path(self, 'boxtexture')) 
+        ## fields by region
+        self.sinopsys = get_value_from_list_prefix(node['jeu'], ['synopsis'], 'synopsis_', langs, "")
+        self.date = get_value_from_list_prefix(node['jeu'], ['dates'], 'date_', langs, "")
+        self.category = get_value_from_list_prefix(node['jeu'], ['genres'], 'genres_', langs, "")
+        
+        ## Now the downloaded content
+        self.media = dict()
+        medias = node['jeu'].get('medias')
+        if not medias:
+            print("We dont have medias to download for: '" + self.filepath + "'")
+            return
+   
 
-        media_boxs2d_region_key = get_key_from_prefix(medias['media_boxs']['media_boxs2d'], 
-                'media_box2d_', romregion + user_regions)
-        self.box2d = self.create_media(medias['media_boxs']['media_boxs2d'], media_boxs2d_region_key, 
-                config.get_download_path(self, 'flyer')) 
+        self.media['screenshot'] = self.create_media(medias, 'media_screenshot', config.get_download_path(self, 'snap'))
+        self.media['video'] = self.create_media(medias, 'media_video', config.get_download_path(self, 'video'))
+       
+        media_tmp = medias.get('media_wheels', None)
+        if media_tmp:
+            media_wheels_region_key = get_key_from_prefix(media_tmp,'media_wheel_', romregion + user_regions)
+            self.wheel = self.create_media(media_tmp, media_wheels_region_key, 
+                config.get_download_path(self, 'wheel'))
+      
+        media_box = medias.get('media_boxs', None)
+        if media_box:
+            for sufix_key in ['boxtexture' , 'box2d', 'box2d-side', "box2d-back", "box3d"]:
+                boxs_key = sufix_key[:3] + 's' + sufix_key[3:]
+                media_tmp =  media_box.get('media_' + boxs_key)
+                if not media_tmp:
+                    self.media[sufix_key] = None
+                    continue
+                media_box_region_key = get_key_from_prefix(media_tmp,'media_' + sufix_key + '_', romregion + user_regions)
+                self.media[sufix_key] = self.create_media(media_tmp, media_box_region_key, config.get_download_path(self, sufix_key)) 
 
-#        media_boxs2d_side_region_key = get_key_from_prefix(medias['media_boxs']['media_boxs2d-side'], 
-#                'media_box2d-side_', romregion + user_regions)
-#        self.box2d_side = self.create_media(medias['media_boxs']['media_boxs2d-side'], 
-#                media_boxs2d_side_region_key,
-#                config.get_download_path(self, 'box2d-side')) 
-#
-#        media_boxs2d_back_region_key = get_key_from_prefix(medias['media_boxs']['media_boxs2d-back'], 
-#                'media_box2d-back_', romregion + user_regions)
-#        self.box2d_back = self.create_media(medias['media_boxs']['media_boxs2d-back'],
-#                media_boxs2d_back_region_key,
-#                config.get_download_path(self, 'box2d-back')) 
-#
-#        media_box3d_region_key = get_key_from_prefix(medias['media_boxs']['media_boxs3d'], 
-#                'media_box3d_', romregion + user_regions)
-#        self.box3d = self.create_media(medias['media_boxs']['media_boxs3d'], media_box3d_region_key, 
-#                config.get_download_path(self, 'box3d')) 
-#        self.romregion = romregion
+        media_supports = medias.get('media_supports', None)
+        if media_supports:
+            for sufix_key in ['supporttexture' , 'support2d', 'support2d-side', "support2d-back", "support3d"]:
+                support_key = sufix_key[:7] + 's' + sufix_key[7:]
+                media_tmp =  media_supports.get('media_' + support_key)
+                if not media_tmp:
+                    self.media[sufix_key] = None
+                    continue
+                media_supports_region_key = get_key_from_prefix(media_tmp, 'media_' + sufix_key + '_', romregion + user_regions)
+                self.media[sufix_key] = self.create_media(media_tmp, media_supports_region_key, config.get_download_path(self, sufix_key)) 
+
 
 
 class MultipleHashes:
@@ -201,30 +247,6 @@ class MultipleHashes:
 
 
 
-def get_key_from_prefix (dictionary, prefix_key, sufixes_keys): 
-    found_key = False
-    for sufix_key in sufixes_keys:
-        result_key = prefix_key + sufix_key
-        if result_key in dictionary:
-            found_key = True
-            break
-
-    # if not return first key found
-    if not found_key:
-        result_key = None
-        for key, value in dictionary.items():
-            # Ensure we dont have more than one '_':
-            # if we search 'prefix_key' we dont want 'prefix_key_subkey1_subkey2'
-            index = key.find(prefix_key);
-            if(index >= 0):
-#                print("result_key0 : " + key)
-                index_ = key[len(prefix_key):].find("_")
-                if(index_ < 0 ):
-#                    print("result_key1: " + key)
-                    result_key = key
-                    break
-
-    return result_key
 
 class ScreenScraperFrApi:
     def __init__(self, ssid, sspassword, config):
@@ -252,18 +274,24 @@ class ScreenScraperFrApi:
 
     def __get_json_from_request(self, request):
         if request.status_code != 200:
-            raise Exception('Request: ' + request.url  +  '. http status code is not 200: ' + str(request.status_code) )
+            raise Exception('Request: ' + request.url  +  '. http status code is not 200: ' + str(request.status_code))
         r_json = request.json()
         if r_json['header']['success'] != 'true':
             raise Exception('Request is not successfull!! : ' + request.url)
         return r_json
 
-    def get_platform_info(self):
+    def get_platform_info(self, json_file_path = None):
         payload = self.__get_payload_base()
-        r = requests.get(self.url_base + 'systemesListe.php', params=payload)
-        r_json = self.__get_json_from_request(r)
-        #print(r.text)
-        r_json = r.json()
+        r_json = None
+        if not json_file_path:
+            r = requests.get(self.url_base + 'systemesListe.php', params=payload)
+            r_json = self.__get_json_from_request(r)
+            r_json = r.json()
+            #print(r.text)
+        else:
+            with open(json_file_path) as json_file:
+                r_json = json.load(json_file)
+
         response = r_json['response']
         self.max_threads = int(response['ssuser'] ['maxthreads'])
         print("max_threads: " + str(self.max_threads))
@@ -281,7 +309,18 @@ class ScreenScraperFrApi:
         payload['sha1'] = hashes.sha1sum 
         r = requests.get(self.url_base + 'jeuInfos.php', params=payload)
         r_json = self.__get_json_from_request(r)
-        game = Game(hashes.filepath, r_json['response'], self.systems, self.config)
+
+#        r_json = None
+#        with open('./traces/Mario Bros..json') as json_file:
+#            r_json = json.load(json_file)
+#
+        try:
+            game = Game(hashes.filepath, r_json['response'], self.systems, self.config)
+            #game = Game(hashes.filepath, None, self.systems, self.config)
+            pprint.pprint(game)
+        except KeyError:
+            print("Cannot get game info for ROM: '" + hashes.filepath + "'" )
+            
 #        f = open('traces/' + game.name +  ".json" , 'w')
 #        f.write(r.text)
 #        f.close()
@@ -290,12 +329,12 @@ class ScreenScraperFrApi:
 
 def worker_hashing(q_files, q_download):
     while True:
-        print('h0: waiting in q_files: ' + str(q_files.empty()))
+#        print('h0: waiting in q_files: ' + str(q_files.empty()))
         filepath = q_files.get()
-        print('h1: ' + str(filepath))
+#        print('h1: ' + str(filepath))
         
         hashes = MultipleHashes(filepath)
-        print('h3: ' + str(hashes))
+#        print('h3: ' + str(hashes))
     
         #Hack to have the example hashes
         #hashes.crc32sum = '50ABC90A'
@@ -323,21 +362,28 @@ def worker_download(q):
         hashes = q.get()
         print('d1: '+ hashes.filepath)
         game = ss.get_game_info(hashes)
+        if not game:
+            q.task_done()
+            continue
 
         print("attractmode: " + game.to_str_attractmode_format())
         f = open(game.system + ".txt" , 'a')
         f.write(game.to_str_attractmode_format() + "\n")
         f.close()
-        download_media(game.screenshot)
-        download_media(game.video)
-        download_media(game.wheel)
-        # TODO: put a config option to chose what we want to download
-        # flyer is the name for boxes
-#        download_media(game.flyer)
-        download_media(game.box2d)
-#        download_media(game.box2d_side)
-#        download_media(game.box2d_back)
-#        download_media(game.box3d)
+
+###########################
+# FIXME
+###########################
+        q.task_done()
+        continue
+###########################
+# FIXME
+###########################
+        for key, media in game.media:
+            if not media:
+                print('Not media: ' + media + 'for game: ' + game.name)
+                continue
+            download_media(media)
 
         q.task_done()
 
@@ -373,6 +419,7 @@ if __name__ == "__main__":
 
     ss = ScreenScraperFrApi(user, password, config)
     ss.get_platform_info()
+    #ss.get_platform_info('./traces/screenscraper_platform_list.json')
 
     if args.list_systems:
         pprint.pprint(ss.systems)
