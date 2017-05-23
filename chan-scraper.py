@@ -6,6 +6,7 @@ import zlib
 import requests
 import json
 import sys
+import traceback
 import os
 import threading
 import queue
@@ -88,18 +89,24 @@ class Configuration:
         # TODO: hay que bajar a  los directorios: 
         #  - flyer marquee snap wheel
         media_dir = self.config['general'].get(media + '_dir', media)
-        emulator = self.config[game.system].get('emulator', 'TODO_EMULATOR')
+        emulator = self.get_emulator(game)
         d = dict(
+                game_name = game.name,
                 game_filename = game.filename,
                 emulator = emulator,
-                media_dir = media_dir
+                media_dir = media_dir,
+                system = game.system
                 )
         path = self.template_download.substitute(d)
         return path
 
     def get_emulator(self, game):
-        emulator=  self.config[game.system].get('emulator', "TODO_EMULATOR")
-        print("Getting emulator for system: " + game.system + ": " + emulator)
+        try:
+            system = self.config.get(game.system, None)
+            emulator=  system.get('emulator', "TODO_EMULATOR")
+            print("Getting emulator for system: " + game.system + ": " + emulator)
+        except configparser.NoSectionError:
+            return "TODO_EMULATOR"
         return emulator
         
 
@@ -202,28 +209,26 @@ class Game:
             media_wheels_region_key = get_key_from_prefix(media_tmp,'media_wheel_', romregion + user_regions)
             self.wheel = self.create_media(media_tmp, media_wheels_region_key, 
                 config.get_download_path(self, 'wheel'))
-      
-        media_box = medias.get('media_boxs', None)
-        if media_box:
-            for sufix_key in ['boxtexture' , 'box2d', 'box2d-side', "box2d-back", "box3d"]:
-                boxs_key = sufix_key[:3] + 's' + sufix_key[3:]
-                media_tmp =  media_box.get('media_' + boxs_key)
-                if not media_tmp:
-                    self.media[sufix_key] = None
-                    continue
-                media_box_region_key = get_key_from_prefix(media_tmp,'media_' + sufix_key + '_', romregion + user_regions)
-                self.media[sufix_key] = self.create_media(media_tmp, media_box_region_key, config.get_download_path(self, sufix_key)) 
+    
+            #Now define a function  
+            def scrape_media_region(media_result, medias, prefix_key, type_key_list, regions_list):
+                media = medias.get('media_' + prefix_key + 's', None)
+                if not media:
+                    return media_result 
 
-        media_supports = medias.get('media_supports', None)
-        if media_supports:
-            for sufix_key in ['supporttexture' , 'support2d', 'support2d-side', "support2d-back", "support3d"]:
-                support_key = sufix_key[:7] + 's' + sufix_key[7:]
-                media_tmp =  media_supports.get('media_' + support_key)
-                if not media_tmp:
-                    self.media[sufix_key] = None
-                    continue
-                media_supports_region_key = get_key_from_prefix(media_tmp, 'media_' + sufix_key + '_', romregion + user_regions)
-                self.media[sufix_key] = self.create_media(media_tmp, media_supports_region_key, config.get_download_path(self, sufix_key)) 
+                for sub_type_key in type_key_list:
+                    type_key = prefix_key + sub_type_key
+                    types_key = prefix_key + 's' + sub_type_key
+                    media_tmp =  media.get('media_' + types_key)
+                    if not media_tmp:
+            #            result[type_key] = None
+                        continue
+                    media_box_region_key = get_key_from_prefix(media_tmp,'media_' + type_key + '_', regions_list)
+                    media_result[type_key] = self.create_media(media_tmp, media_box_region_key, config.get_download_path(self, type_key))
+                return media_result
+
+        self.media = scrape_media_region(self.media, medias, 'box', ['texture' , '2d', '2d-side', "2d-back", "3d"], romregion + user_regions)
+        self.media = scrape_media_region(self.media, medias, 'support', ['texture' , '2d', '2d-side', "2d-back", "3d"], romregion + user_regions)
 
 
 
@@ -321,12 +326,13 @@ class ScreenScraperFrApi:
 #
             game = Game(hashes.filepath, r_json['response'], self.systems, self.config)
             #game = Game(hashes.filepath, None, self.systems, self.config)
-            pprint.pprint(game)
-        except KeyError:
-            print("Cannot get game info for ROM: '" + hashes.filepath + "'" )
+        except KeyError as err:
+            print("Cannot get game info for ROM: '" + hashes.filepath + "': " , err)
+            traceback.print_exc()
             game = None
         except Exception as err:
             print('Handling run-time error:', err)
+            traceback.print_exc()
             game = None
             
         return game
@@ -377,17 +383,12 @@ def worker_download(q):
         f.write(game.to_str_attractmode_format() + "\n")
         f.close()
 
-###########################
-# FIXME
-###########################
-        q.task_done()
-        continue
-###########################
-# FIXME
-###########################
-        for key, media in game.media:
+#        pprint.pprint(game.media)
+        for  key in game.media:
+            media = game.media[key]
+            #print('Media: ' + str(media )+ ' for game: ' + game.name)
             if not media:
-                print('Not media: ' + media + 'for game: ' + game.name)
+                print('Not media: ' + str(media) + 'for game: ' + game.name)
                 continue
             download_media(media)
 
