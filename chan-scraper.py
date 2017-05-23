@@ -307,23 +307,28 @@ class ScreenScraperFrApi:
         payload['crc'] = hashes.crc32sum
         payload['md5'] = hashes.md5sum
         payload['sha1'] = hashes.sha1sum 
-        r = requests.get(self.url_base + 'jeuInfos.php', params=payload)
-        r_json = self.__get_json_from_request(r)
+        game = None
+        try:
+            r = requests.get(self.url_base + 'jeuInfos.php', params=payload)
+            r_json = self.__get_json_from_request(r)
+            f = open('traces/' + hashes.md5sum +  ".json" , 'w')
+            f.write(r.text)
+            f.close()
 
 #        r_json = None
 #        with open('./traces/Mario Bros..json') as json_file:
 #            r_json = json.load(json_file)
 #
-        try:
             game = Game(hashes.filepath, r_json['response'], self.systems, self.config)
             #game = Game(hashes.filepath, None, self.systems, self.config)
             pprint.pprint(game)
         except KeyError:
             print("Cannot get game info for ROM: '" + hashes.filepath + "'" )
+            game = None
+        except Exception as err:
+            print('Handling run-time error:', err)
+            game = None
             
-#        f = open('traces/' + game.name +  ".json" , 'w')
-#        f.write(r.text)
-#        f.close()
         return game
 
 
@@ -363,6 +368,7 @@ def worker_download(q):
         print('d1: '+ hashes.filepath)
         game = ss.get_game_info(hashes)
         if not game:
+            print('Warning: Cannot get info for rom: '+ hashes.filepath)
             q.task_done()
             continue
 
