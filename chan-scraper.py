@@ -278,6 +278,8 @@ class ScreenScraperFrApi:
         return payload
 
     def __get_json_from_request(self, request):
+        #pprint.pprint(request)
+        #print("req: " + request.text)
         if request.status_code != 200:
             raise Exception('Request: ' + request.url  +  '. http status code is not 200: ' + str(request.status_code))
         r_json = request.json()
@@ -316,9 +318,9 @@ class ScreenScraperFrApi:
         try:
             r = requests.get(self.url_base + 'jeuInfos.php', params=payload)
             r_json = self.__get_json_from_request(r)
-            f = open('traces/' + hashes.md5sum +  ".json" , 'w')
-            f.write(r.text)
-            f.close()
+            #f = open('traces/' + hashes.md5sum +  ".json" , 'w')
+            #f.write(r.text)
+            #f.close()
 
 #        r_json = None
 #        with open('./traces/Mario Bros..json') as json_file:
