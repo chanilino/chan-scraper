@@ -208,8 +208,9 @@ class Game:
             return
    
 
-        self.media['screenshot'] = self.create_media(medias, 'media_screenshot', config.get_download_path(self, 'snap'))
+        self.media['screenshot'] = self.create_media(medias, 'media_screenshot', config.get_download_path(self, 'screenshot'))
         self.media['video'] = self.create_media(medias, 'media_video', config.get_download_path(self, 'video'))
+        self.media['fanart'] = self.create_media(medias, 'media_fanart', config.get_download_path(self, 'fanart'))
        
         media_tmp = medias.get('media_wheels', None)
         if media_tmp:
@@ -369,14 +370,21 @@ def download_media(media):
             if (hashes.crc32sum == media.crc32sum 
                     and hashes.md5sum == media.md5sum
                     and hashes.sha1sum == media.sha1sum):
-                logger.info("Media already downloaded: '" + media.download_path + "'")
+                #msg =  "T: " + str(threading.get_ident())
+                msg = ""
+                msg += " Already downloaded: : '" + media.download_path + "'"
+                logger.info(msg)
                 return
+
         except FileNotFoundError:
             # If no file continue
             pass
         dir_download = os.path.dirname(media.download_path) 
         os.makedirs(dir_download, mode=0o755, exist_ok=True)
-        logger.info("Downloading to: " + media.download_path)
+        #msg =  "T: " + str(threading.get_ident())
+        msg = ""
+        msg += " Downloading to: '" + media.download_path + "'"
+        logger.info(media)
         with open(media.download_path, 'wb') as f:
             for chunk in r.iter_content(2048):
                 f.write(chunk)
@@ -445,7 +453,6 @@ if __name__ == "__main__":
         exit(0)
 
     max_ss_threads = ss.max_threads
-    max_ss_threads = 1
     queue_files = queue.Queue()
     threads_hashing = []
     queue_download = queue.Queue()
