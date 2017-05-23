@@ -19,7 +19,7 @@ import logging
 FORMAT = '%(asctime)-15s %(levelname)-7s: %(message)s'
 logging.basicConfig(format=FORMAT)
 logger = logging.getLogger('chan-scraper')
-logger.setLevel('DEBUG')
+#logger.setLevel('DEBUG')
 logger.setLevel('INFO')
 
 def get_key_from_prefix (dictionary, prefix_key, sufixes_keys): 
@@ -123,8 +123,8 @@ class Media:
 
     def __init__(self, url, crc32, md5, sha1sum, download_path):
         self.url = url
-        self.crc32 = crc32
-        self.md5 = md5
+        self.crc32sum = crc32
+        self.md5sum = md5
         self.sha1sum = sha1sum
         parsed = urllib.parse.urlparse(url)
         extension = urllib.parse.parse_qs(parsed.query)['mediaformat'][0]
@@ -214,25 +214,25 @@ class Game:
         media_tmp = medias.get('media_wheels', None)
         if media_tmp:
             media_wheels_region_key = get_key_from_prefix(media_tmp,'media_wheel_', romregion + user_regions)
-            self.wheel = self.create_media(media_tmp, media_wheels_region_key, 
+            logger.debug("media_wheel: " + media_wheels_region_key)
+            self.media['wheel'] = self.create_media(media_tmp, media_wheels_region_key, 
                 config.get_download_path(self, 'wheel'))
     
             #Now define a function  
-            def scrape_media_region(media_result, medias, prefix_key, type_key_list, regions_list):
-                media = medias.get('media_' + prefix_key + 's', None)
-                if not media:
-                    return media_result 
-
-                for sub_type_key in type_key_list:
-                    type_key = prefix_key + sub_type_key
-                    types_key = prefix_key + 's' + sub_type_key
-                    media_tmp =  media.get('media_' + types_key)
-                    if not media_tmp:
-            #            result[type_key] = None
-                        continue
-                    media_box_region_key = get_key_from_prefix(media_tmp,'media_' + type_key + '_', regions_list)
-                    media_result[type_key] = self.create_media(media_tmp, media_box_region_key, config.get_download_path(self, type_key))
-                return media_result
+        def scrape_media_region(media_result, medias, prefix_key, type_key_list, regions_list):
+            media = medias.get('media_' + prefix_key + 's', None)
+            if not media:
+                return media_result 
+            for sub_type_key in type_key_list:
+                type_key = prefix_key + sub_type_key
+                types_key = prefix_key + 's' + sub_type_key
+                media_tmp =  media.get('media_' + types_key)
+                if not media_tmp:
+        #            result[type_key] = None
+                    continue
+                media_box_region_key = get_key_from_prefix(media_tmp,'media_' + type_key + '_', regions_list)
+                media_result[type_key] = self.create_media(media_tmp, media_box_region_key, config.get_download_path(self, type_key))
+            return media_result
 
         self.media = scrape_media_region(self.media, medias, 'box', ['texture' , '2d', '2d-side', "2d-back", "3d"], romregion + user_regions)
         self.media = scrape_media_region(self.media, medias, 'support', ['texture' , '2d', '2d-side', "2d-back", "3d"], romregion + user_regions)
@@ -286,12 +286,23 @@ class ScreenScraperFrApi:
 
     def __get_json_from_request(self, request):
         #pprint.pprint(request)
-        #print("req: " + request.text)
+        #logger.debug("req: " + request.text)
+        index = request.text.find('{')
+        json_text = ""
+        if index > 0:
+            json_text =  request.text[index:]
+            logger.debug("json: '" + json_text[:50] + "'" )
+            logger.warning("API msg: '" + request.text[:index] + "'")
+        else:
+            json_text = request.text 
+
         if request.status_code != 200:
-            raise Exception('Request: ' + request.url  +  '. http status code is not 200: ' + str(request.status_code))
-        r_json = request.json()
+            raise Exception('Request: ' + request.url  +  '. http status code is not 200: ' 
+                    + str(request.status_code) + str(request.text))
+        r_json = json.loads(json_text)
         if r_json['header']['success'] != 'true':
-            raise Exception('Request is not successfull!! : ' + request.url)
+            raise Exception('Request is not successfull!! : ' + request.url
+                    + str(request.text))
         return r_json
 
     def get_platform_info(self, json_file_path = None):
@@ -345,22 +356,29 @@ class ScreenScraperFrApi:
 def worker_hashing(q_files, q_download):
     while True:
         filepath = q_files.get()
-        
         hashes = MultipleHashes(filepath)
-    
         q_files.task_done()
-        
         q_download.put(hashes)
         
 
 def download_media(media):
     r = requests.get(media.url, stream=True)
     if r.status_code == 200:
+        try:
+            hashes = MultipleHashes(media.download_path)
+            if (hashes.crc32sum == media.crc32sum 
+                    and hashes.md5sum == media.md5sum
+                    and hashes.sha1sum == media.sha1sum):
+                logger.info("Media already downloaded: '" + media.download_path + "'")
+                return
+        except FileNotFoundError:
+            # If no file continue
+            pass
         dir_download = os.path.dirname(media.download_path) 
         os.makedirs(dir_download, mode=0o755, exist_ok=True)
         logger.info("Downloading to: " + media.download_path)
         with open(media.download_path, 'wb') as f:
-            for chunk in r.iter_content(1024):
+            for chunk in r.iter_content(2048):
                 f.write(chunk)
 
 
