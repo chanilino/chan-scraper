@@ -14,6 +14,13 @@ import urllib
 import time
 import configparser
 from string import Template
+import logging
+
+FORMAT = '%(asctime)-15s %(levelname)-7s: %(message)s'
+logging.basicConfig(format=FORMAT)
+logger = logging.getLogger('chan-scraper')
+logger.setLevel('DEBUG')
+logger.setLevel('INFO')
 
 def get_key_from_prefix (dictionary, prefix_key, sufixes_keys): 
     found_key = False
@@ -81,8 +88,7 @@ class Configuration:
         self.langs = [x.strip(' ') for x in self.langs]
         self.regions = self.config['general']['regions'].split(',')
         self.regions = [x.strip(' ') for x in self.regions]
-        print("Reading config file: '" + config_file + "'")
-
+        logger.info("Reading config file: '" + config_file + "'")
 
     def get_download_path(self, game, media):
         # parse config and return the string
@@ -104,8 +110,9 @@ class Configuration:
         try:
             system = self.config.get(game.system, None)
             emulator=  system.get('emulator', "TODO_EMULATOR")
-            print("Getting emulator for system: " + game.system + ": " + emulator)
+            logger.debug("Getting emulator for system: " + game.system + ": " + emulator)
         except configparser.NoSectionError:
+            logger.warning("There is not section in config file for system: " + game.system)
             return "TODO_EMULATOR"
         return emulator
         
@@ -124,7 +131,7 @@ class Media:
         #print('type: ' +  extension)
         self.download_path = download_path + '.' + extension
 #        print("Url: " + self.url + ': ' + self.crc32 + ': ' + self.md5 + ': ' + self.sha1sum )
-        print("Download to: " + self.download_path )
+        logger.debug("Download to: " + self.download_path )
 
 class Game:
     def create_media(self, node, node_name, download_path):
@@ -197,7 +204,7 @@ class Game:
         self.media = dict()
         medias = node['jeu'].get('medias')
         if not medias:
-            print("We dont have medias to download for: '" + self.filepath + "'")
+            logger.warning("We dont have medias to download for: '" + self.filepath + "'")
             return
    
 
@@ -301,7 +308,7 @@ class ScreenScraperFrApi:
 
         response = r_json['response']
         self.max_threads = int(response['ssuser'] ['maxthreads'])
-        print("max_threads: " + str(self.max_threads))
+        logger.info("ScreenScraper max threads: " + str(self.max_threads))
 #        pprint.pprint(response['systemes'])
         systems = response['systemes']
         for system in systems:
@@ -327,14 +334,9 @@ class ScreenScraperFrApi:
 #            r_json = json.load(json_file)
 #
             game = Game(hashes.filepath, r_json['response'], self.systems, self.config)
-            #game = Game(hashes.filepath, None, self.systems, self.config)
-        except KeyError as err:
-            print("Cannot get game info for ROM: '" + hashes.filepath + "': " , err)
-            traceback.print_exc()
-            game = None
-        except Exception as err:
-            print('Handling run-time error:', err)
-            traceback.print_exc()
+        except (KeyError, Exception) as err:
+            logger.warning("Cannot get game info for ROM: '" + hashes.filepath + "': " , err)
+            #traceback.print_exc()
             game = None
             
         return game
@@ -342,17 +344,10 @@ class ScreenScraperFrApi:
 
 def worker_hashing(q_files, q_download):
     while True:
-#        print('h0: waiting in q_files: ' + str(q_files.empty()))
         filepath = q_files.get()
-#        print('h1: ' + str(filepath))
         
         hashes = MultipleHashes(filepath)
-#        print('h3: ' + str(hashes))
     
-        #Hack to have the example hashes
-        #hashes.crc32sum = '50ABC90A'
-        #hashes.md5sum = 'DD6CDEDF6AB92BAD42752C99F91EA420'
-        #hashes.sha1sum = '72D0431690165361681C19BEDEFED384818B2C66'
         q_files.task_done()
         
         q_download.put(hashes)
@@ -363,7 +358,7 @@ def download_media(media):
     if r.status_code == 200:
         dir_download = os.path.dirname(media.download_path) 
         os.makedirs(dir_download, mode=0o755, exist_ok=True)
-        print("Downloading to: " + media.download_path)
+        logger.info("Downloading to: " + media.download_path)
         with open(media.download_path, 'wb') as f:
             for chunk in r.iter_content(1024):
                 f.write(chunk)
@@ -371,29 +366,25 @@ def download_media(media):
 
 def worker_download(q):
     while True:
-        print('d0: waiting in q_download')
         hashes = q.get()
-        print('d1: '+ hashes.filepath)
         game = ss.get_game_info(hashes)
         if not game:
-            print('Warning: Cannot get info for rom: '+ hashes.filepath)
+            logger.warning('Warning: Cannot get info for rom: '+ hashes.filepath)
             q.task_done()
             continue
 
-        print("attractmode: " + game.to_str_attractmode_format())
+        logger.debug("attractmode: " + game.to_str_attractmode_format())
+
         f = open(game.system + ".txt" , 'a')
         f.write(game.to_str_attractmode_format() + "\n")
         f.close()
 
-#        pprint.pprint(game.media)
         for  key in game.media:
             media = game.media[key]
-            #print('Media: ' + str(media )+ ' for game: ' + game.name)
             if not media:
-                print('Not media: ' + str(media) + 'for game: ' + game.name)
+                logger.warning('Not media: ' + str(media) + 'for game: ' + game.name)
                 continue
             download_media(media)
-
         q.task_done()
 
 
@@ -429,7 +420,6 @@ if __name__ == "__main__":
     ss = ScreenScraperFrApi(user, password, config)
     ss.get_platform_info()
     #ss.get_platform_info('./traces/screenscraper_platform_list.json')
-
     if args.list_systems:
         pprint.pprint(ss.systems)
 #        for id_system, name_system in ss.systems:
@@ -458,7 +448,7 @@ if __name__ == "__main__":
     for f in os.listdir(roms_path):
         if os.path.isfile(os.path.join(roms_path, f)):
                 rom_path = os.path.join(roms_path, f)
-                print('rom added: ' + rom_path)
+                logger.debug('rom added: ' + rom_path)
                 queue_files.put(rom_path)
 
     
