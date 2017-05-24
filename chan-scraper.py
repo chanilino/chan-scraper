@@ -15,12 +15,28 @@ import time
 import configparser
 from string import Template
 import logging
+import csv
 
 FORMAT = '%(asctime)-15s %(levelname)-7s: %(message)s'
 logging.basicConfig(format=FORMAT)
 logger = logging.getLogger('chan-scraper')
 logger.setLevel('INFO')
 #logger.setLevel('DEBUG')
+
+class RomListAttract:
+    def __init__(self, romlistfile):
+        with open(romlistfile) as csvfile:
+            header_line = 'Name;Title;Emulator;CloneOf;Year;Manufacturer;Category;Players;Rotation;Control;Status;DisplayCount;DisplayType;AltRomname;AltTitle;Extra;Buttons'
+            dialect = csv.Sniffer().sniff(header_line)
+            csvfile.seek(0)
+            fieldnames = header_line.split(';')
+            reader = csv.DictReader(csvfile, dialect=dialect, fieldnames=fieldnames)
+            for row in reader:
+                print("Name: " + row['Name'])
+                print("Year: " + str(row['Year']))
+        
+
+
 
 def get_key_from_prefix (dictionary, prefix_key, sufixes_keys): 
     found_key = False
@@ -472,6 +488,9 @@ def worker_download(q):
                 continue
             download_media(media)
         q.task_done()
+
+RomListAttract("Super Nintendo.txt")
+exit(0)
 
 
 if __name__ == "__main__":
