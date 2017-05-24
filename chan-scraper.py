@@ -19,8 +19,8 @@ import logging
 FORMAT = '%(asctime)-15s %(levelname)-7s: %(message)s'
 logging.basicConfig(format=FORMAT)
 logger = logging.getLogger('chan-scraper')
-#logger.setLevel('DEBUG')
 logger.setLevel('INFO')
+#logger.setLevel('DEBUG')
 
 def get_key_from_prefix (dictionary, prefix_key, sufixes_keys): 
     found_key = False
@@ -280,6 +280,7 @@ class ScreenScraperFrApi:
         self.langs = config.langs
         self.systems = dict()
         self.config = config
+        
 
     def __get_payload_base(self):
         payload = {}
@@ -295,13 +296,20 @@ class ScreenScraperFrApi:
         #pprint.pprint(request)
         #logger.debug("req: " + request.text)
         index = request.text.find('{')
+        request.content
+        request.close()
+        
         json_text = ""
         if index > 0:
             json_text =  request.text[index:]
-            logger.debug("json: '" + json_text[:50] + "'" )
             logger.warning("API msg: '" + request.text[:index] + "'")
+            logger.warning("json: '" + json_text[:500] + "'" )
+        elif index == 0:
+            json_text = request.text
         else:
-            json_text = request.text 
+            logger.error("API msg: '" + request.text + "'")
+            raise Exception('API Error response is not json: ' + request.text) 
+
 
         if request.status_code != 200:
             raise Exception('Request: ' + request.url  +  '. http status code is not 200: ' 
@@ -318,7 +326,6 @@ class ScreenScraperFrApi:
         if not json_file_path:
             r = requests.get(self.url_base + 'systemesListe.php', params=payload)
             r_json = self.__get_json_from_request(r)
-            r_json = r.json()
             #print(r.text)
         else:
             with open(json_file_path) as json_file:
@@ -353,7 +360,8 @@ class ScreenScraperFrApi:
 #
             game = Game(hashes.filepath, r_json['response'], self.systems, self.config)
         except (KeyError, Exception) as err:
-            logger.warning("Cannot get game info for ROM: '" + hashes.filepath + "': " , err)
+            #logger.warning("Cannot get game info for ROM: '" + hashes.filepath + "': " , err)
+            logger.warning("Cannot get game info for ROM: '" + hashes.filepath )
             #traceback.print_exc()
             game = None
             
