@@ -107,14 +107,20 @@ class Configuration:
         return path
 
     def get_emulator(self, game):
+        default_emulator = "TODO_EMULATOR"
         try:
-            system = self.config.get(game.system, None)
-            emulator=  system.get('emulator', "TODO_EMULATOR")
+            emulator = self.config.get(game.system, 'emulator')
             logger.debug("Getting emulator for system: " + game.system + ": " + emulator)
+            return emulator
         except configparser.NoSectionError:
             logger.warning("There is not section in config file for system: " + game.system)
-            return "TODO_EMULATOR"
-        return emulator
+            self.config.add_section(game.system)
+        except KeyError: 
+            logger.warning("There is not key 'emulator'  in section: " + game.system)
+        
+        self.config.set(game.system, 'emulator', default_emulator)
+           
+        return default_emulator
         
 
 class Media:
