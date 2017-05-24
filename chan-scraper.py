@@ -323,22 +323,31 @@ class ScreenScraperFrApi:
     def get_platform_info(self, json_file_path = None):
         payload = self.__get_payload_base()
         r_json = None
-        if not json_file_path:
-            r = requests.get(self.url_base + 'systemesListe.php', params=payload)
-            r_json = self.__get_json_from_request(r)
-            #print(r.text)
-        else:
-            with open(json_file_path) as json_file:
-                r_json = json.load(json_file)
+        try:
+            if not json_file_path:
+                r = requests.get(self.url_base + 'systemesListe.php', params=payload)
+                r_json = self.__get_json_from_request(r)
+                print(r.text)
+            else:
+                with open(json_file_path) as json_file:
+                    r_json = json.load(json_file)
 
-        response = r_json['response']
-        self.max_threads = int(response['ssuser'] ['maxthreads'])
-        logger.info("ScreenScraper max threads: " + str(self.max_threads))
-#        pprint.pprint(response['systemes'])
-        systems = response['systemes']
-        for system in systems:
-            self.systems[system['id']] = system['noms']['nom_eu']
-#            print('system id: ' + str(system['id']) + ': ' + self.systems[system['id']] )
+            response = r_json['response']
+            ssuser = response.get('ssuser')
+            if ssuser:
+                self.max_threads = int(ssuser.get('maxthreads', 1))
+                logger.info("Setting ScreenScraper max threads: " + str(self.max_threads))
+
+#            pprint.pprint(response['systemes'])
+            systems = response['systemes']
+            for system in systems:
+                self.systems[system['id']] = system['noms']['nom_eu']
+#                print('system id: ' + str(system['id']) + ': ' + self.systems[system['id']] )
+        except (KeyError, Exception) as err:
+            #logger.warning("Cannot get game info for ROM: '" + hashes.filepath + "': " , err)
+            self.systems = None
+            logger.warning("Cannot get platform info: ", err)
+            #traceback.print_exc()
 
 
     def get_game_info (self, hashes):
@@ -459,6 +468,10 @@ if __name__ == "__main__":
 
     ss = ScreenScraperFrApi(user, password, config)
     ss.get_platform_info()
+    if not ss.systems:
+        logger.error("Cannot get platform info. Exit")
+        exit(1)
+
     #ss.get_platform_info('./traces/screenscraper_platform_list.json')
     if args.list_systems:
         pprint.pprint(ss.systems)
