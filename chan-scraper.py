@@ -444,7 +444,7 @@ def download_media(media):
         #msg =  "T: " + str(threading.get_ident()) + " "
         msg = ""
         msg += "Downloading to: '" + media.download_path + "'"
-        logger.info(media)
+        logger.info(msg)
         with open(media.download_path, 'wb') as f:
             for chunk in r.iter_content(2048):
                 f.write(chunk)
