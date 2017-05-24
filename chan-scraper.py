@@ -280,6 +280,7 @@ class ScreenScraperFrApi:
         self.langs = config.langs
         self.systems = dict()
         self.config = config
+        self.__get_user_info()
         
 
     def __get_payload_base(self):
@@ -320,6 +321,24 @@ class ScreenScraperFrApi:
                     + str(request.text))
         return r_json
 
+    def __get_user_info(self):
+        payload = self.__get_payload_base()
+        r_json = None
+        try:
+            r = requests.get(self.url_base + 'ssuserInfos.php', params=payload)
+            r_json = self.__get_json_from_request(r)
+            response = r_json['response']
+            ssuser = response.get('ssuser')
+            if ssuser:
+                self.max_threads = int(ssuser.get('maxthreads', 1))
+                logger.info("Setting ScreenScraper max threads: " + str(self.max_threads))
+            else:
+                logger.error("Cannot get user info")
+        except (KeyError, Exception) as err:
+            #logger.warning("Cannot get game info for ROM: '" + hashes.filepath + "': " , err)
+            logger.warning("Cannot get user info: ", err)
+    
+    
     def get_platform_info(self, json_file_path = None):
         payload = self.__get_payload_base()
         r_json = None
@@ -327,18 +346,13 @@ class ScreenScraperFrApi:
             if not json_file_path:
                 r = requests.get(self.url_base + 'systemesListe.php', params=payload)
                 r_json = self.__get_json_from_request(r)
-                print(r.text)
+               # print(r.text)
             else:
                 with open(json_file_path) as json_file:
                     r_json = json.load(json_file)
 
-            response = r_json['response']
-            ssuser = response.get('ssuser')
-            if ssuser:
-                self.max_threads = int(ssuser.get('maxthreads', 1))
-                logger.info("Setting ScreenScraper max threads: " + str(self.max_threads))
-
 #            pprint.pprint(response['systemes'])
+            response = r_json['response']
             systems = response['systemes']
             for system in systems:
                 self.systems[system['id']] = system['noms']['nom_eu']
