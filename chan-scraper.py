@@ -468,7 +468,7 @@ def worker_download(q):
         for  key in game.media:
             media = game.media[key]
             if not media:
-                logger.warning('Not media: ' + str(key) + 'for game: ' + game.name)
+                logger.warning('Not media: ' + str(key) + ' for game: ' + game.name)
                 continue
             download_media(media)
         q.task_done()
