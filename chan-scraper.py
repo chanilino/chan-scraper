@@ -422,27 +422,28 @@ def worker_hashing(q_files, q_download):
         
 
 def download_media(media):
+    try:
+        hashes = MultipleHashes(media.download_path)
+        if (hashes.crc32sum == media.crc32sum 
+                and hashes.md5sum == media.md5sum
+                and hashes.sha1sum == media.sha1sum):
+            #msg =  "T: " + str(threading.get_ident()) + " "
+            msg = ""
+            msg += "Already downloaded: : '" + media.download_path + "'"
+            logger.info(msg)
+            return
+
+    except FileNotFoundError:
+        # If no file continue
+        pass
+
     r = requests.get(media.url, stream=True)
     if r.status_code == 200:
-        try:
-            hashes = MultipleHashes(media.download_path)
-            if (hashes.crc32sum == media.crc32sum 
-                    and hashes.md5sum == media.md5sum
-                    and hashes.sha1sum == media.sha1sum):
-                #msg =  "T: " + str(threading.get_ident())
-                msg = ""
-                msg += " Already downloaded: : '" + media.download_path + "'"
-                logger.info(msg)
-                return
-
-        except FileNotFoundError:
-            # If no file continue
-            pass
         dir_download = os.path.dirname(media.download_path) 
         os.makedirs(dir_download, mode=0o755, exist_ok=True)
-        #msg =  "T: " + str(threading.get_ident())
+        #msg =  "T: " + str(threading.get_ident()) + " "
         msg = ""
-        msg += " Downloading to: '" + media.download_path + "'"
+        msg += "Downloading to: '" + media.download_path + "'"
         logger.info(media)
         with open(media.download_path, 'wb') as f:
             for chunk in r.iter_content(2048):
