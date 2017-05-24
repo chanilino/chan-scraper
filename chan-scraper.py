@@ -279,6 +279,7 @@ class ScreenScraperFrApi:
         self.user_regions = config.regions
         self.langs = config.langs
         self.systems = dict()
+        self.systems_ids = dict()
         self.config = config
         self.__get_user_info()
         
@@ -333,6 +334,7 @@ class ScreenScraperFrApi:
                 self.max_threads = int(ssuser.get('maxthreads', 1))
                 logger.info("Setting ScreenScraper max threads: " + str(self.max_threads))
             else:
+                logger.info("request: " +r.text)
                 logger.error("Cannot get user info")
         except (KeyError, Exception) as err:
             #logger.warning("Cannot get game info for ROM: '" + hashes.filepath + "': " , err)
@@ -356,6 +358,7 @@ class ScreenScraperFrApi:
             systems = response['systemes']
             for system in systems:
                 self.systems[system['id']] = system['noms']['nom_eu']
+                self.systems_ids [system['noms']['nom_eu']] = system['id']
 #                print('system id: ' + str(system['id']) + ': ' + self.systems[system['id']] )
         except (KeyError, Exception) as err:
             #logger.warning("Cannot get game info for ROM: '" + hashes.filepath + "': " , err)
@@ -384,7 +387,26 @@ class ScreenScraperFrApi:
             game = Game(hashes.filepath, r_json['response'], self.systems, self.config)
         except (KeyError, Exception) as err:
             #logger.warning("Cannot get game info for ROM: '" + hashes.filepath + "': " , err)
-            logger.warning("Cannot get game info for ROM: '" + hashes.filepath )
+            logger.warning("Cannot get game info by crc ROM: '" + hashes.filepath )
+            #traceback.print_exc()
+            game = None
+       
+        if (game) or (not self.config.config['general'].getboolean('enable_search_by_filename')):
+            return game
+        
+        payload = self.__get_payload_base()
+        payload['romnom'] = os.path.splitext(os.path.basename(hashes.filepath))[0]
+        system =  self.config.config['general']['fallback_system']
+        if system != "":
+            payload['systemeid'] = self.systems_ids[system]
+
+        try:
+            r = requests.get(self.url_base + 'jeuInfos.php', params=payload)
+            r_json = self.__get_json_from_request(r)
+            game = Game(hashes.filepath, r_json['response'], self.systems, self.config)
+        except (KeyError, Exception) as err:
+            #logger.warning("Cannot get game info for ROM: '" + hashes.filepath + "': " , err)
+            logger.warning("Cannot get game info by name: '" + hashes.filepath )
             #traceback.print_exc()
             game = None
             
