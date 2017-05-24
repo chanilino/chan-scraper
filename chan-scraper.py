@@ -406,7 +406,7 @@ class ScreenScraperFrApi:
             game = Game(hashes.filepath, r_json['response'], self.systems, self.config)
         except (KeyError, Exception) as err:
             #logger.warning("Cannot get game info for ROM: '" + hashes.filepath + "': " , err)
-            logger.warning("Cannot get game info by name: '" + hashes.filepath )
+            logger.warning("Cannot get game info by name ROM: '" + hashes.filepath )
             #traceback.print_exc()
             game = None
             
