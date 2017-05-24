@@ -79,15 +79,18 @@ class Configuration:
         return result
 
     def __init__(self, config_file = "chan-scraper.ini"):
-        #self.config = configparser.ConfigParser(interpolation=configparser.ExtendedInterpolation())
-        self.config = configparser.ConfigParser()
+        self.config = configparser.ConfigParser(interpolation=configparser.ExtendedInterpolation())
+        #self.config = configparser.ConfigParser()
         self.config.read(config_file)
-        self.template_download = Template(self.config['general']['download_path'])
-        self.template_download.braced = True
+        self.template_download = Template(self.config['general']['download_path'].replace('%', '$'))
         self.langs = self.config['general']['langs'].split(',')
         self.langs = [x.strip(' ') for x in self.langs]
         self.regions = self.config['general']['regions'].split(',')
         self.regions = [x.strip(' ') for x in self.regions]
+        self.fallback_system = self.config['general'] ['fallback_system']
+        self.enable_search_by_filename = self.config['general'] ['enable_search_by_filename']
+        self.attract_romlist_file = self.config['general'] ['attract_romlist_file']
+
         logger.info("Reading config file: '" + config_file + "'")
 
     def get_download_path(self, game, media):
@@ -106,21 +109,24 @@ class Configuration:
         path = self.template_download.substitute(d)
         return path
 
-    def get_emulator(self, game):
+    def get_emulator_by_system(self, system):
         default_emulator = "TODO_EMULATOR"
         try:
-            emulator = self.config.get(game.system, 'emulator')
-            logger.debug("Getting emulator for system: " + game.system + ": " + emulator)
+            emulator = self.config.get(system, 'emulator')
+            logger.debug("Getting emulator for system: " + system + ": " + emulator)
             return emulator
         except configparser.NoSectionError:
-            logger.warning("There is not section in config file for system: " + game.system)
-            self.config.add_section(game.system)
+            logger.warning("There is not section in config file for system: " + system)
+            self.config.add_section(system)
         except KeyError: 
-            logger.warning("There is not key 'emulator'  in section: " + game.system)
+            logger.warning("There is not key 'emulator'  in section: " + system)
         
-        self.config.set(game.system, 'emulator', default_emulator)
+        self.config.set(system, 'emulator', default_emulator)
            
         return default_emulator
+
+    def get_emulator(self, game):
+        return self.get_emulator_by_system( game.system)
         
 
 class Media:
@@ -189,6 +195,7 @@ class Game:
         self.name = node['jeu']['nom']
         self.systemid = node['jeu'][ 'systemeid']
         self.system = systems[int(self.systemid)]
+        self.romlist = config.attract_romlist_file
 
         # Not compulsory
         self.emulator = config.get_emulator(self)
@@ -461,7 +468,7 @@ def worker_download(q):
 
         logger.debug("attractmode: " + game.to_str_attractmode_format())
 
-        f = open(game.system + ".txt" , 'a')
+        f = open(game.romlist , 'a')
         f.write(game.to_str_attractmode_format() + "\n")
         f.close()
 
@@ -511,9 +518,10 @@ if __name__ == "__main__":
 
     #ss.get_platform_info('./traces/screenscraper_platform_list.json')
     if args.list_systems:
-        pprint.pprint(ss.systems)
-#        for id_system, name_system in ss.systems:
-#            print(str(id_system) + ": " + str(name_system))
+#        pprint.pprint(ss.systems)
+        for id_system in ss.systems:
+            print(str(id_system) + ": " + ss.systems[id_system] + ": " 
+                    + config.get_emulator_by_system(ss.systems[id_system]))
         exit(0)
 
     max_ss_threads = ss.max_threads
